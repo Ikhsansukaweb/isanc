@@ -66,12 +66,31 @@ mysql -u root -p isanc < data/schema.mysql.sql
 
 ### 2. Konfigurasi
 
+Ada **dua** berkas konfigurasi. Keduanya sudah tersedia dalam bentuk template
+(berisi nama variabel + nilai contoh), jadi tinggal disalin lalu diisi:
+
 ```bash
-cp .env.example .env          # backend
-cp web/.env.example web/.env.local   # frontend
+cp .env.example .env                  # backend  (port, database, rahasia, QRIS, catbox)
+cp web/.env.example web/.env.local    # frontend (alamat API, origin gambar QRIS)
 ```
 
-Isi nilai di `.env`. **Jangan pernah commit `.env`** — berkas aslinya sudah diblokir `.gitignore`.
+Petunjuk lengkap tiap variabel ada sebagai komentar di dalam kedua berkas itu —
+baca langsung di sana, termasuk mana yang **wajib** diisi dan cara membuat nilai
+acak untuk `JWT_SECRET` / `INTERNAL_SECRET`.
+
+> **Penting:** `NEXT_PUBLIC_API_URL` dan `QRIS_URL` di frontend menentukan izin
+> Content-Security-Policy. Kalau nilainya tidak sama dengan yang dipanggil kode,
+> browser akan memblokir request/gambar — halaman tampak normal tapi login, chat,
+> atau gambar QRIS diam-diam tidak jalan.
+
+Isi nilai di `.env` lalu kencangkan izin berkasnya:
+
+```bash
+chmod 600 .env
+```
+
+**Jangan pernah commit `.env`** — berkas aslinya sudah diblokir `.gitignore`.
+Hanya `.env.example` (template) yang masuk repo, dan itu memang tanpa rahasia.
 
 Bangkitkan rahasia acak:
 

@@ -14,11 +14,21 @@ web/tsconfig.tsbuildinfo
 # ===== Rahasia / kredensial — JANGAN PERNAH DI-COMMIT =====
 .env
 .env.*
-!.env.example          # contoh isi boleh ikut, tanpa nilai asli
 web/.env.local
 *.pem
 *.key
 *.p12
+
+# PENGECUALIAN: berkas contoh (template) MEMANG harus ikut ke repo.
+# Isinya hanya nama variabel dengan nilai palsu — tidak ada kredensial asli.
+#
+# CATATAN PENTING: .gitignore TIDAK mendukung komentar di baris yang sama
+# dengan pola. Sebelumnya ditulis `!.env.example   # contoh...`, sehingga
+# polanya dianggap "!.env.example   # contoh..." dan tidak cocok dengan apa
+# pun — akibatnya template ikut terabaikan dan tidak pernah ter-push.
+# Tulis komentar di baris TERPISAH.
+!.env.example
+!web/.env.example
 
 # ===== Database lokal =====
 data/*.db
