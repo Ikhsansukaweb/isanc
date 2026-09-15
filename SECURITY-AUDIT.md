@@ -1789,3 +1789,95 @@ cd ~/Documents/afk-bedrock/web && npm start
 - `npm install` **tidak** mengubah proses yang sedang jalan; restart tetap perlu.
 - Tunnel mati (HTTP 530) → `pm2 start cloudflared --name afk-tunnel -- tunnel
   --config ~/.cloudflared/config.yml run`, lalu `pm2 save`.
+
+---
+
+# PERBAIKAN: FOTO QRIS HILANG (2026-09-15)
+
+## Gejala
+
+Gambar QR tidak muncul di halaman **Saldo** saat ada deposit `pending`.
+Yang tampil hanya kotak abu-abu bertuliskan "QR tidak tersedia".
+
+## Akar masalah (dua lapis)
+
+### 1. URL gambar salah — kurang akhiran `.png`
+
+Gateway ariepulsa **tidak pernah mengirim** field gambar QR. Baik
+`get-deposit` maupun `status-deposit` hanya mengembalikan `link_payment`:
+
+```json
+{"status":true,"data":{
+  "kode_deposit":"AFK-3-...",
+  "link_payment":"https://ariepulsa.com/pay-qrisgo/AFK-3-...",
+  "fee":7, "jumlah_transfer":1007, "saldo_diterima":1000
+}}
+```
+
+Tidak ada `qr_url`, `link_qr`, `url_qr`, maupun `qr_string`. Gambar QR ternyata
+dilayani di pola path tetap, dan **wajib** diakhiri `.png`:
+
+| URL | Hasil |
+|---|---|
+| `.../assets/images/qris/<kode>` | **HTTP 404** |
+| `.../assets/images/qris/<kode>.png` | **HTTP 200** `image/png` |
+
+Kode lama mencoba `pickString(resp, [... 'url'])` — tidak ada yang cocok,
+sehingga `qr_url` berisi NULL atau (pada deposit lama) URL tanpa `.png`.
+
+### 2. CSP memblokir domain gateway
+
+`img-src` hanya mengizinkan `'self' data: blob: https://files.catbox.moe`.
+Meski URL gambarnya benar, browser tetap menolak memuatnya. Jadi **dua-duanya**
+harus diperbaiki — memperbaiki URL saja tidak cukup.
+
+## Patch
+
+**`src/lib/qris.ts`**
+- Tambah `buildQrisImageUrl(kodeDeposit)` — menyusun URL gambar dari origin
+  `QRIS_URL` + `/assets/images/qris/<kode>.png`.
+- Tambah `resolveQrUrl(fromGateway, kodeDeposit)` — memakai nilai gateway kalau
+  ada, menyusun sendiri kalau tidak, dan **melengkapi `.png`** pada nilai lama
+  yang tersimpan tanpa ekstensi.
+- Dipakai di `createDeposit` (deposit baru), `checkDeposit` (cek status), dan
+  `listDeposits` (riwayat) sehingga deposit lama pun langsung tampil tanpa
+  migrasi data.
+- Hapus key `'url'` dari `pickString` — terlalu longgar, bisa salah menangkap
+  field yang bukan gambar.
+
+**`web/next.config.mjs`**
+- `img-src` ditambah origin gateway QRIS, diturunkan dari `QRIS_URL` supaya
+  tidak bisa lagi berbeda dengan backend (pelajaran yang sama seperti insiden
+  `connect-src` di login).
+
+## Verifikasi
+
+```
+=== Deposit baru ===
+  qr_url : https://ariepulsa.com/assets/images/qris/AFK-3-1789481624105-783.png
+  HTTP 200 | image/png | 1040 byte
+
+=== Riwayat (8 deposit, termasuk yang lama rusak) ===
+  OK  pending  AFK-3-1789481624105-783   HTTP 200
+  OK  pending  AFK-3-1789481413436-46    HTTP 200
+  OK  cancel   AFK-3-1789481305853-784   HTTP 200
+  OK  pending  AFK-3-1789477118568-265   HTTP 200
+  OK  pending  AFK-3-1789476138391-384   HTTP 200
+  OK  pending  AFK-3-1789476123608-208   HTTP 200
+  OK  cancel   9172344643                HTTP 200
+  OK  pending  7558449557                HTTP 200
+  >>> 8 bisa dimuat | 0 gagal | 0 tanpa qr_url
+
+=== CSP produksi ===
+  img-src 'self' data: blob: https://files.catbox.moe https://ariepulsa.com
+```
+
+## Pelajaran
+
+1. **Jangan percaya field opsional dari API pihak ketiga.** Dokumentasi/wrapper
+   tidak menjamin field seperti `qr_url` benar-benar ada. Perlu dicek dengan
+   respons nyata, bukan diasumsikan.
+2. **URL file statis pihak ketiga harus diverifikasi dengan `curl -I`.** Pola
+   path tanpa ekstensi terlihat benar tapi menghasilkan 404.
+3. **Gambar eksternal butuh izin `img-src` di CSP.** Memperbaiki URL saja tidak
+   cukup — CSP tetap memblokir, dan gejalanya identik ("gambar hilang").

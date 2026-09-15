@@ -34,6 +34,45 @@ export function qrisEnabled(): boolean {
   return QRIS_API_KEY.length > 0;
 }
 
+/**
+ * Bentuk URL gambar QR dari kode deposit.
+ *
+ * PENTING: gateway ariepulsa (baik `get-deposit` maupun `status-deposit`)
+ * TIDAK mengirim field gambar/QR sama sekali — yang ada hanya `link_payment`.
+ * Gambar QR tersedia di pola path tetap berikut, dan WAJIB diakhiri `.png`;
+ * tanpa ekstensi itu server membalas 404 (inilah penyebab gambar QR "hilang").
+ *
+ * Sudah diverifikasi:
+ *   .../assets/images/qris/<kode>       -> HTTP 404
+ *   .../assets/images/qris/<kode>.png   -> HTTP 200 image/png
+ */
+export function buildQrisImageUrl(kodeDeposit: string): string | null {
+  const kode = kodeDeposit.trim();
+  if (!kode) return null;
+  try {
+    const base = new URL(QRIS_URL);
+    return `${base.origin}/assets/images/qris/${encodeURIComponent(kode)}.png`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Isi `qr_url` kalau gateway tidak memberikannya (kasus normal di sini),
+ * dan perbaiki nilai lama yang tersimpan tanpa akhiran `.png`.
+ * URL pihak ketiga yang sah (bukan pola assets/images/qris) dibiarkan apa adanya.
+ */
+function resolveQrUrl(fromGateway: string | null, kodeDeposit: string): string | null {
+  const built = buildQrisImageUrl(kodeDeposit);
+  if (!fromGateway) return built;
+
+  // Nilai lama bisa tersimpan tanpa ".png" — tambahkan kalau polanya cocok.
+  if (fromGateway.includes('/assets/images/qris/') && !fromGateway.endsWith('.png')) {
+    return `${fromGateway}.png`;
+  }
+  return fromGateway;
+}
+
 /** Panggil API QRIS. Timeout 25s supaya tidak menggantung. */
 async function callQris(fields: Record<string, string>): Promise<Record<string, unknown>> {
   const form = new FormData();
@@ -138,7 +177,8 @@ export async function createDeposit(userId: number, amount: number): Promise<Cre
   const unik = pickNumber(resp, ['kode_unik']) ?? 0;
   const total = pickNumber(resp, ['jumlah_transfer', 'total_bayar', 'total', 'jumlah_bayar']) ?? amount + fee + unik;
   const saldoDidapat = pickNumber(resp, ['saldo_didapat']) ?? amount;
-  const qrUrl = pickString(resp, ['link_qr', 'qr_url', 'url_qr', 'qris_url', 'url']);
+  // Gateway tidak mengirim gambar QR -> susun sendiri dari kode deposit.
+  const qrUrl = resolveQrUrl(pickString(resp, ['link_qr', 'qr_url', 'url_qr', 'qris_url']), kode);
   const qrString = pickString(resp, ['qr_string', 'qris_string', 'qr_content', 'qris_content']);
   const payUrl = pickString(resp, ['link_payment', 'payment_url', 'url_payment']);
   const expiredAt = pickString(resp, ['expired', 'expired_at', 'kadaluarsa']);
@@ -194,8 +234,12 @@ export async function checkDeposit(userId: number, kodeDeposit: string) {
   const resp = await callQris({ action: 'status-deposit', kode_deposit: kodeDeposit });
   const rawStatus = String(pickString(resp, ['status', 'status_deposit', 'state']) ?? '').toLowerCase();
 
-  // Gateway kadang tidak mengirim ulang link QR saat cek status → isi dari nilai lama
-  const qrUrl = pickString(resp, ['link_qr', 'qr_url', 'url_qr', 'qris_url']);
+  // Gateway tidak mengirim ulang gambar QR saat cek status → susun dari kode
+  // deposit (kalau gateway mengirim, pakai itu; kalau tidak, tetap terisi).
+  const qrUrl = resolveQrUrl(
+    pickString(resp, ['link_qr', 'qr_url', 'url_qr', 'qris_url']) ?? dep.qr_url,
+    kodeDeposit
+  );
   const qrString = pickString(resp, ['qr_string', 'qris_string', 'qr_content']);
   const payUrl = pickString(resp, ['link_payment', 'payment_url']);
   const total = pickNumber(resp, ['jumlah_transfer', 'total_bayar', 'total', 'jumlah_bayar']);
@@ -329,8 +373,12 @@ export async function cancelDeposit(userId: number, kodeDeposit: string) {
 }
 
 export async function listDeposits(userId: number, limit = 20): Promise<DepositRow[]> {
-  return db.all<DepositRow>('SELECT * FROM deposits WHERE user_id = ? ORDER BY id DESC LIMIT ?', [
-    userId,
-    limit,
-  ]);
+  const rows = await db.all<DepositRow>(
+    'SELECT * FROM deposits WHERE user_id = ? ORDER BY id DESC LIMIT ?',
+    [userId, limit]
+  );
+
+  // Deposit lama tersimpan dengan qr_url tanpa ".png" (penyebab gambar 404).
+  // Diperbaiki di sini supaya riwayat lama langsung tampil tanpa migrasi data.
+  return rows.map((r) => ({ ...r, qr_url: resolveQrUrl(r.qr_url, r.kode_deposit) }));
 }

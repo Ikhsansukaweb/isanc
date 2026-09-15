@@ -16,6 +16,19 @@ const API = (
 ).replace(/\/$/, '');
 const WS = API.replace(/^http/, 'ws');
 
+/*
+ * Origin gambar QRIS (gateway ariepulsa).
+ *
+ * Diturunkan dari QRIS_URL supaya konsisten dengan backend — gambar QR
+ * dilayani dari domain gateway yang sama.
+ */
+let QRIS_ORIGIN = 'https://ariepulsa.com';
+try {
+  QRIS_ORIGIN = new URL(process.env.QRIS_URL ?? 'https://ariepulsa.com/api/qrisgo').origin;
+} catch {
+  /* pakai default */
+}
+
 // Origin tambahan yang memang diperlukan halaman.
 //  - cloudflareinsights.com → beacon analitik yang disuntik Cloudflare, bukan kode kita.
 //  - challenges.cloudflare.com → widget Turnstile kalau nanti diaktifkan.
@@ -33,14 +46,16 @@ const CLOUDFLARE = 'https://static.cloudflareinsights.com https://cloudflareinsi
  * Catatan:
  *  - 'unsafe-inline' pada script/style diperlukan runtime Next.js.
  *    Untuk pengerasan lanjutan, migrasikan ke nonce berbasis middleware.
- *  - img-src mengizinkan files.catbox.moe karena foto profil disimpan di sana.
+ *  - img-src mengizinkan files.catbox.moe (foto profil) dan origin gateway
+ *    QRIS (gambar QR di halaman saldo). Tanpa origin QRIS di sini, gambarnya
+ *    sudah benar URL-nya tapi tetap diblokir browser → tampak "hilang".
  */
 const CSP = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' ${CLOUDFLARE} https://challenges.cloudflare.com`,
   "script-src-elem 'self' 'unsafe-inline' " + CLOUDFLARE + " https://challenges.cloudflare.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://files.catbox.moe",
+  `img-src 'self' data: blob: https://files.catbox.moe ${QRIS_ORIGIN}`,
   "font-src 'self' data:",
   `connect-src 'self' ${API} ${WS}`,
   // Blob/data: dipakai untuk pembuatan worker & sumber internal Next.js.
