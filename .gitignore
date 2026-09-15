@@ -1,0 +1,82 @@
+# ===== Dependensi =====
+node_modules/
+*/node_modules/
+
+# ===== Build output =====
+dist/
+build/
+.next/
+*/.next/
+out/
+*.tsbuildinfo
+web/tsconfig.tsbuildinfo
+
+# ===== Rahasia / kredensial — JANGAN PERNAH DI-COMMIT =====
+.env
+.env.*
+!.env.example          # contoh isi boleh ikut, tanpa nilai asli
+web/.env.local
+*.pem
+*.key
+*.p12
+
+# ===== Database lokal =====
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/*.sqlite*
+data/*.dump
+# Backup & salinan database (berisi data user asli: hash password, token, saldo)
+data/*.backup*
+data/*.bak
+data/*.old
+data/*.orig
+*.backup-sqlite
+*.sqlite
+*.sqlite3
+
+# ===== Sesi & auth (login Microsoft bot) =====
+data/auth/
+data/profiles/
+# Cache login Microsoft (berisi TOKEN OAuth asli — bisa dipakai
+# mengambil alih akun MS yang terhubung ke bot. JANGAN PERNAH di-commit.)
+data/mc-profiles/
+mc-profiles/
+*-cache.json
+*_msal-cache.json
+profiles/
+auth/
+
+# ===== Log & berkas sementara =====
+*.log
+logs/
+pm2-*.log
+.hermes/
+tmp/
+*.tmp
+*.tmp.mjs
+*.tmp.sh
+verify-*.mjs
+verify-*.tmp.mjs
+
+# ===== Backup & arsip =====
+*.bak
+*.backup
+*.tar
+*.tar.gz
+*.zip
+.backup/
+
+# ===== Editor & OS =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# ===== Cache =====
+.cache/
+.turbo/
+.eslintcache
+coverage/

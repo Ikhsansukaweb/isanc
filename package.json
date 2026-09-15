@@ -1,0 +1,48 @@
+{
+  "name": "afk-bedrock",
+  "version": "0.1.0",
+  "description": "AFK client for Minecraft Bedrock (bedrock-protocol) with web dashboard",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "audit:ci": "npm audit --omit=dev --audit-level=high"
+  },
+  "overrides": {
+    "tar": "^7.5.2",
+    "axios": "^1.7.9",
+    "uuid": "^11.1.1"
+  },
+  "dependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/ws": "^8.18.1",
+    "bcryptjs": "^3.0.3",
+    "bedrock-protocol": "^3.57.0",
+    "better-sqlite3": "^11.10.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.0",
+    "helmet": "^8.0.0",
+    "jose": "^6.2.12",
+    "minecraft-data": "^3.111.0",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.24.4",
+    "ws": "^8.21.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
